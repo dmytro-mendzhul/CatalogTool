@@ -11,16 +11,31 @@ namespace CatalogTool.MendzhulTextHelpers
                 return 0d;
 
             var comparer = new SentenceStringComparer();
+            var similarity = comparer.ComputeSimilarity(x, y);
+            return similarity;
+        }
+    }
 
-            var length = comparer.Length(x) + comparer.Length(y);
-            var dist = comparer.Dist(x, y);
-
-            var same = length - 2 * dist;
-
-            if (length <= 0 || same <= 0)
+    static class SimilarityHelper
+    {
+        public static double Similarity(double totalLength, double distance)
+        {
+            if (totalLength <= 0)
                 return 0;
 
-            return Math.Sqrt(same / length);
+            var doubledDistance = Math.Max(0, distance) * 2;
+
+            if (doubledDistance >= totalLength)
+                return 0;
+
+            return (totalLength - doubledDistance) / totalLength;
+        }
+
+        public static double ComputeSimilarity<T>(this IComparer<T> comparer, T x, T y)
+        {
+            var distance = comparer.Dist(x, y);
+            var totalLength = comparer.Length(x) + comparer.Length(y);
+            return Similarity(totalLength, distance);
         }
     }
 
@@ -35,7 +50,7 @@ namespace CatalogTool.MendzhulTextHelpers
     {
         public double Dist(char x, char y)
         {
-            return x == y ? 0 : string.Equals(x.ToString(), y.ToString(), StringComparison.OrdinalIgnoreCase) ? 0.9 : 1;
+            return x == y ? 0 : string.Equals(x.ToString(), y.ToString(), StringComparison.OrdinalIgnoreCase) ? 0.1 : 1;
         }
 
         public double Length(char x)
@@ -113,14 +128,13 @@ namespace CatalogTool.MendzhulTextHelpers
         {
             this.simpleStringComparer = simpleStringComparer ?? new SimpleStringComparer();
             MaxIndex = maxIndex;
-            //length = Math.Sqrt(MaxIndex);
         }
 
         public double Dist(IndexedString x, IndexedString y)
         {
             var d = simpleStringComparer.Dist(x.Value, y.Value);
-            var shift = /*length **/ Math.Abs(x.Index - y.Index);// / (MaxIndex + 1);
-            return (d + shift);
+            var shift = Math.Abs(x.Index - y.Index);
+            return d + shift;
         }
 
         public double Length(IndexedString x) => simpleStringComparer.Length(x.Value);
@@ -135,18 +149,24 @@ namespace CatalogTool.MendzhulTextHelpers
             var xWords = ToIndexedWords(x);
             var yWords = ToIndexedWords(y);
 
-            var d = simpleComparer.Dist(string.Join(" ", xWords.Select(a => a.Value)), string.Join(" ", yWords.Select(a => a.Value)));
+            var sd = simpleComparer.Dist(string.Join("", xWords.Select(a => a.Value)), string.Join("", yWords.Select(a => a.Value)));
 
             var sc = new IndexedStringsComparer(Math.Max(xWords.Length, yWords.Length), simpleComparer);
             var lc = new LevenshteinComparer<IndexedString>(sc);
-            return lc.Dist(xWords, yWords) + d;
+            var ld = lc.Dist(xWords, yWords);
+            return ld + sd;
         }
 
         public double Length(string x)
         {
             var xWords = ToIndexedWords(x);
+            var simpleLength = xWords.Sum(xw => xw.Value.Length);
+
             var sc = new IndexedStringsComparer(xWords.Length, simpleComparer);
-            return xWords.Sum(a => sc.Length(a)) + x.Length + 1;
+            var lc = new LevenshteinComparer<IndexedString>(sc);
+            var sentenceLength = lc.Length(xWords);
+
+            return sentenceLength + simpleLength;
         }
 
         private static IndexedString[] ToIndexedWords(string x)
