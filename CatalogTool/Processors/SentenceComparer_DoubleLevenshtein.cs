@@ -34,8 +34,18 @@ namespace CatalogTool.MendzhulTextHelpers
         public static double ComputeSimilarity<T>(this IComparer<T> comparer, T x, T y)
         {
             var distance = comparer.Dist(x, y);
-            var totalLength = comparer.Length(x) + comparer.Length(y);
-            return Similarity(totalLength, distance);
+            double lengthOfX = comparer.Length(x);
+            double lengthOfY = comparer.Length(y);
+            var totalLength = lengthOfX + lengthOfY;
+            var similarity = Similarity(totalLength, distance);
+            return lengthOfX == lengthOfY
+                ? similarity
+                : similarity * LengthCorrection(lengthOfX, lengthOfY, totalLength);
+        }
+
+        private static double LengthCorrection(double lengthOfX, double lengthOfY, double totalLength)
+        {
+            return Math.Sqrt(1 - Math.Abs(lengthOfX - lengthOfY) / totalLength);
         }
     }
 
